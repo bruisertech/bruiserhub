@@ -26,16 +26,19 @@ Todos los endpoints residen bajo el namespace `/wp-json/bruiser/v1` y requieren 
 | `/products` | `GET` | N/A | Obtiene la lista de todos los productos de WooCommerce publicados (`id`, `title`). |
 | `/search-images` | `POST` | `query` (string, ej: "Nombre Producto parfum") | Proxy hacia la API Serper.dev para recuperar 9 imágenes. Oculta la clave de API en el backend. |
 | `/set-product-image`| `POST` | `product_id` (int)<br>`image_url` (uri string) | Descarga la imagen en servidor con `media_sideload_image` y la asocia a WooCommerce como miniatura principal en 1 paso. |
+| `/price-check`| `GET` | `product_id` (int) | Endpoint matemático. Extrae el precio de WooCommerce (COP), busca en Google Shopping Serper, limpia los valores (elimina monedas y puntos), compara variaciones del 5% y devuelve `inferior`, `similar` y `mayor` con una alerta global calculada contra la media de mercado. |
 
 ## 3. Diccionario de Funciones Principales
 
 - **`bruiserhub_register_admin_menu()`**: Registra la página en el menú de WordPress con el título "🔥 BRUISER HUB" y un ícono SVG de fuego color gris nativo.
 - **`bruiserhub_admin_enqueue_scripts()`**: Encola `wp-element` (React nativo de WP), `admin.js` y `admin.css`.
-- **`BruiserHubApp` (React)**: Componente principal que administra las pestañas entre `BruiserTerminal` e `ImageSelector`.
+- **`BruiserHubApp` (React)**: Componente principal que administra las pestañas entre `BruiserTerminal`, `ImageSelector` y `PriceComparator`.
 - **`BruiserTerminal` (React)**: Motor interactivo de comandos simulado estilo Mac. Maneja un historial en array (inputs + respuestas asíncronas). Soporta comandos como `help/ayuda`, `hora/time`, `count/cantidad` (usando la REST API para WooCommerce), y permite cambiar colores dinámicamente (`color #hex`).
 - **`ImageSelector` (React)**: Interfaz de 2 clics para WooCommerce. Lee productos (`/products`), dispara búsqueda en Serper al seleccionar producto (`/search-images`), y asigna la imagen cliqueada directamente (`/set-product-image`).
-- **`BruiserHub_API::get_products_handler()`**: Controlador para listar productos WP/WC.
-- **`BruiserHub_API::search_images_handler()`**: Controlador Proxy para Serper (Usa API Key 2779d3b77de0f2b5d966b323fed4b8cb7da99cf3 de Daniel).
+- **`PriceComparator` (React)**: Tercera pestaña aislada. Clona el UI de `ImageSelector` a la derecha. Presenta resultados matemáticos de Serper divididos en tres columnas (Baratos, Similares, Caros) con alertas de color según posición en el mercado.
+- **`BruiserHub_API::get_products_handler()`**: Controlador para listar productos WP/WC (con foto).
+- **`BruiserHub_API::price_check_handler()`**: Controlador lógico-matemático. Evalúa competitividad en COP (Col).
+- **`BruiserHub_API::search_images_handler()`**: Controlador Proxy para Serper (Usa la API Key configurada en la base de datos `bruiserhub_serper_api_key`).
 - **`BruiserHub_API::set_product_image_handler()`**: Controlador de ingesta de medios usando funciones nativas admin de WP.
 - **`BruiserHub_API::check_permissions()`**: Validador CRÍTICO de seguridad. Comprueba `is_user_logged_in()` y que el `user_login` actual sea exactamente `user`.
 - **`BruiserHub_API::validate_path()`**: Filtro de seguridad que previene retrocesos de directorio (`..`) y garantiza resoluciones dentro de `WP_CONTENT_DIR`.

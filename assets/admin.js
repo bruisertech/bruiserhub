@@ -390,6 +390,149 @@ function ImageSelector() {
     );
 }
 
+function PriceComparator() {
+    const [products, setProducts] = useState([]);
+    const [selectedProductId, setSelectedProductId] = useState('');
+    const [report, setReport] = useState(null);
+    const [statusMessage, setStatusMessage] = useState('Cargando productos...');
+    const [isLoading, setIsLoading] = useState(true);
+
+    // Initial load: Fetch WooCommerce products (Reusing the same endpoint)
+    useEffect(() => {
+        fetch(`${bruiserhubData.root}bruiser/v1/products`, {
+            headers: { 'X-WP-Nonce': bruiserhubData.nonce }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.code && data.message) {
+                setStatusMessage('Error: ' + data.message);
+                setIsLoading(false);
+                return;
+            }
+            setProducts(data);
+            setStatusMessage('');
+            setIsLoading(false);
+        })
+        .catch(error => {
+            setStatusMessage('Error cargando productos.');
+            setIsLoading(false);
+        });
+    }, []);
+
+    const handleProductSelect = (product) => {
+        if (isLoading) return;
+
+        setSelectedProductId(product.id);
+        setReport(null);
+        setStatusMessage(`Analizando mercado para "${product.title}"...`);
+        setIsLoading(true);
+
+        fetch(`${bruiserhubData.root}bruiser/v1/price-check?product_id=${product.id}`, {
+            method: 'GET',
+            headers: { 'X-WP-Nonce': bruiserhubData.nonce }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.code && data.message) {
+                setStatusMessage('Error: ' + data.message);
+                setIsLoading(false);
+                return;
+            }
+            if (data.status) { // It's a string message when no results found
+                setStatusMessage(data.status);
+                setIsLoading(false);
+                return;
+            }
+
+            setReport(data);
+            setStatusMessage('');
+            setIsLoading(false);
+        })
+        .catch(error => {
+            setStatusMessage('Error al consultar el mercado.');
+            setIsLoading(false);
+        });
+    };
+
+    const renderColumnItems = (items) => {
+        if (!items || items.length === 0) return createElement('div', { className: 'price-comp-item' }, 'No hay resultados');
+        return items.map((item, idx) =>
+            createElement(
+                'div',
+                { key: idx, className: 'price-comp-item' },
+                createElement('div', { className: 'price-comp-item-price' }, item.price_raw),
+                createElement('div', { className: 'price-comp-item-source' }, item.source),
+                createElement('a', { href: item.url, target: '_blank', rel: 'noopener noreferrer' }, 'Ver oferta →')
+            )
+        );
+    };
+
+    return createElement(
+        'div',
+        { className: 'price-comp-container' },
+        // MAIN PANEL (Report)
+        createElement(
+            'div',
+            { className: 'price-comp-main-panel' },
+            (statusMessage) && createElement('div', { className: 'search-status-message' }, statusMessage),
+
+            report && createElement(
+                'div',
+                null,
+                createElement(
+                    'div',
+                    { className: `price-comp-alert ${report.alert_color}` },
+                    report.alert_message
+                ),
+                createElement(
+                    'div',
+                    { className: 'price-comp-columns', style: { marginTop: '20px' } },
+                    // Left Column (Inferior - Baratos)
+                    createElement(
+                        'div',
+                        { className: 'price-comp-col inferior' },
+                        createElement('h3', null, '🟢 Más Baratos'),
+                        renderColumnItems(report.inferior)
+                    ),
+                    // Center Column (Similares - A la par)
+                    createElement(
+                        'div',
+                        { className: 'price-comp-col similar' },
+                        createElement('h3', null, '🟡 A la par (+/- 5%)'),
+                        renderColumnItems(report.similar)
+                    ),
+                    // Right Column (Mayor - Caros)
+                    createElement(
+                        'div',
+                        { className: 'price-comp-col mayor' },
+                        createElement('h3', null, '🔴 Más Caros'),
+                        renderColumnItems(report.mayor)
+                    )
+                )
+            )
+        ),
+        // RIGHT PANEL (Product List - Cloned Structure)
+        createElement(
+            'div',
+            { className: 'selector-right-panel' },
+            products.map((p) =>
+                createElement(
+                    'div',
+                    {
+                        key: p.id,
+                        className: `product-list-item ${selectedProductId === p.id ? 'active' : ''}`,
+                        onClick: () => handleProductSelect(p)
+                    },
+                    p.image
+                        ? createElement('img', { src: p.image, className: 'product-list-item-img', alt: '' })
+                        : createElement('div', { className: 'product-list-item-no-img' }, 'NO IMG'),
+                    createElement('span', null, p.title)
+                )
+            )
+        )
+    );
+}
+
 function BruiserHubApp() {
     const [activeTab, setActiveTab] = useState('terminal');
 
@@ -413,10 +556,18 @@ function BruiserHubApp() {
                     className: `bruiserhub-tab ${activeTab === 'images' ? 'active' : ''}`,
                     onClick: () => setActiveTab('images')
                 },
-                'Buscador de Imágenes (WooCommerce)'
+                'Buscador de Imágenes'
+            ),
+            createElement(
+                'button',
+                {
+                    className: `bruiserhub-tab ${activeTab === 'prices' ? 'active' : ''}`,
+                    onClick: () => setActiveTab('prices')
+                },
+                'Comparador de Precios'
             )
         ),
-        activeTab === 'terminal' ? createElement(BruiserTerminal) : createElement(ImageSelector)
+        activeTab === 'terminal' ? createElement(BruiserTerminal) : (activeTab === 'images' ? createElement(ImageSelector) : createElement(PriceComparator))
     );
 }
 

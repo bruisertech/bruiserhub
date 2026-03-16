@@ -61,6 +61,19 @@ class BruiserHub_API {
             )
         ) );
 
+        // Endpoint de Comparador de Precios (Serper Shopping API)
+        register_rest_route( $this->namespace, '/price-check', array(
+            'methods'  => 'GET',
+            'callback' => array( $this, 'price_check_handler' ),
+            'permission_callback' => array( $this, 'check_permissions' ),
+            'args'     => array(
+                'product_id' => array(
+                    'required' => true,
+                    'type'     => 'integer'
+                )
+            )
+        ) );
+
         // File Manager Endpoint
         register_rest_route( $this->namespace, '/file-manager', array(
             'methods'  => 'POST',
@@ -269,6 +282,152 @@ class BruiserHub_API {
             'product_id' => $product_id,
             'attachment_id' => $attachment_id,
             'message' => 'Image successfully downloaded and assigned to product.'
+        ) );
+    }
+
+    /**
+     * Price Check Handler (Serper.dev Shopping Proxy & Math Engine)
+     */
+    public function price_check_handler( WP_REST_Request $request ) {
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            return new WP_Error( 'no_woocommerce', 'WooCommerce is not installed or active.', array( 'status' => 500 ) );
+        }
+
+        $product_id = $request->get_param( 'product_id' );
+        $product = wc_get_product( $product_id );
+
+        if ( ! $product ) {
+            return new WP_Error( 'invalid_product', 'Product not found.', array( 'status' => 404 ) );
+        }
+
+        $product_title = $product->get_name();
+        $product_price = (float) $product->get_price(); // Precio en COP
+
+        if ( empty( $product_price ) || $product_price <= 0 ) {
+            return new WP_Error( 'no_price', 'This product does not have a valid price to compare.', array( 'status' => 400 ) );
+        }
+
+        // Obtener la clave de API
+        $api_key = get_option( 'bruiserhub_serper_api_key', '' );
+        if ( empty( $api_key ) ) {
+            return new WP_Error( 'api_error', 'Serper API Key no configurada.', array( 'status' => 500 ) );
+        }
+
+        // Realizar la búsqueda de Shopping en Serper (COP Location for better results)
+        $url = 'https://google.serper.dev/shopping';
+        $body = wp_json_encode( array(
+            'q' => $product_title . ' parfum',
+            'gl' => 'co' // Geolocation Colombia
+        ) );
+
+        $response = wp_remote_post( $url, array(
+            'headers' => array(
+                'X-API-KEY' => $api_key,
+                'Content-Type' => 'application/json'
+            ),
+            'body' => $body,
+            'timeout' => 15
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            return new WP_Error( 'api_error', 'Error connecting to Serper API', array( 'status' => 500 ) );
+        }
+
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+
+        if ( ! isset( $data['shopping'] ) || ! is_array( $data['shopping'] ) ) {
+            return rest_ensure_response( array(
+                'local_price' => $product_price,
+                'status' => 'No se encontraron resultados de shopping en Serper.',
+                'inferior' => array(),
+                'similar' => array(),
+                'mayor' => array(),
+                'market_average' => 0,
+                'alert_color' => 'blue',
+                'alert_message' => 'Sin datos suficientes para comparar.'
+            ) );
+        }
+
+        $shopping_results = $data['shopping'];
+
+        $inferior = array();
+        $similar = array();
+        $mayor = array();
+        $all_prices = array();
+
+        foreach ( $shopping_results as $item ) {
+            if ( ! isset( $item['price'] ) ) continue;
+
+            // Clean currency string to float (e.g. "$120.000 COP" or "$120,000")
+            // Remove everything except numbers and dots/commas
+            $raw_price = preg_replace( '/[^0-9\.,]/', '', $item['price'] );
+            // In Colombia, points are thousands and commas are decimals generally, but standardizing:
+            // Remove points, replace comma with point
+            $raw_price = str_replace( '.', '', $raw_price );
+            $raw_price = str_replace( ',', '.', $raw_price );
+            $market_price = (float) $raw_price;
+
+            if ( $market_price <= 0 ) continue;
+
+            $all_prices[] = $market_price;
+
+            $diff_percentage = ( ( $market_price - $product_price ) / $product_price ) * 100;
+
+            $item_data = array(
+                'title' => isset( $item['title'] ) ? $item['title'] : 'Desconocido',
+                'source' => isset( $item['source'] ) ? $item['source'] : 'Web',
+                'price_raw' => $item['price'],
+                'price_num' => $market_price,
+                'url' => isset( $item['link'] ) ? $item['link'] : '#',
+                'image' => isset( $item['imageUrl'] ) ? $item['imageUrl'] : ''
+            );
+
+            if ( $diff_percentage < -5 ) {
+                $inferior[] = $item_data;
+            } else if ( $diff_percentage > 5 ) {
+                $mayor[] = $item_data;
+            } else {
+                $similar[] = $item_data;
+            }
+        }
+
+        // Sort arrays
+        usort( $inferior, function($a, $b) { return $a['price_num'] <=> $b['price_num']; } ); // Más baratos primero
+        usort( $mayor, function($a, $b) { return $b['price_num'] <=> $a['price_num']; } ); // Más caros primero
+        usort( $similar, function($a, $b) { return abs($a['price_num'] - $b['price_num']); } );
+
+        // Limit to 3 items each
+        $inferior = array_slice( $inferior, 0, 3 );
+        $similar  = array_slice( $similar, 0, 3 );
+        $mayor    = array_slice( $mayor, 0, 3 );
+
+        // Calculate averages and alerts
+        $market_average = count( $all_prices ) > 0 ? ( array_sum( $all_prices ) / count( $all_prices ) ) : $product_price;
+
+        $alert_color = 'blue'; // Igual
+        $alert_message = 'A LA PAR DEL MERCADO: Nuestro precio compite en el promedio +/- 5%.';
+
+        $avg_diff_percentage = ( ( $product_price - $market_average ) / $market_average ) * 100;
+
+        if ( $avg_diff_percentage > 5 ) {
+            $alert_color = 'red'; // Somos más caros
+            $alert_message = 'ALERTA ROJA: Nuestro precio (' . wc_price($product_price) . ') es SUPERIOR al promedio del mercado (' . wc_price($market_average) . ').';
+        } else if ( $avg_diff_percentage < -5 ) {
+            $alert_color = 'green'; // Somos más baratos
+            $alert_message = 'ALERTA VERDE: Nuestro precio (' . wc_price($product_price) . ') es INFERIOR al mercado (' . wc_price($market_average) . '). Excelente competitividad.';
+        }
+
+        return rest_ensure_response( array(
+            'local_price' => $product_price,
+            'local_price_formatted' => wc_price( $product_price ),
+            'market_average' => $market_average,
+            'market_average_formatted' => wc_price( $market_average ),
+            'alert_color' => $alert_color,
+            'alert_message' => $alert_message,
+            'inferior' => $inferior,
+            'similar' => $similar,
+            'mayor' => $mayor
         ) );
     }
 

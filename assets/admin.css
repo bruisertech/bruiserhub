@@ -310,11 +310,115 @@
     color: #000;
 }
 
+/* PRICE COMPARATOR ISOLATED STYLES (price-comp-) */
+.price-comp-container {
+    background: #000;
+    border: 1px solid #333;
+    border-radius: 6px;
+    padding: 20px;
+    max-width: 1200px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+}
+
+.price-comp-main-panel {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.price-comp-alert {
+    padding: 15px;
+    border-radius: 4px;
+    font-weight: bold;
+    text-align: center;
+    border: 1px solid transparent;
+}
+
+.price-comp-alert.blue {
+    background: rgba(0, 123, 255, 0.1);
+    color: #4da3ff;
+    border-color: #007bff;
+}
+
+.price-comp-alert.red {
+    background: rgba(220, 53, 69, 0.1);
+    color: #ff6b7b;
+    border-color: #dc3545;
+}
+
+.price-comp-alert.green {
+    background: rgba(40, 167, 69, 0.1);
+    color: #5cd082;
+    border-color: #28a745;
+}
+
+.price-comp-columns {
+    display: flex;
+    gap: 15px;
+    justify-content: space-between;
+}
+
+.price-comp-col {
+    flex: 1;
+    background: #111;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 15px;
+}
+
+.price-comp-col h3 {
+    margin-top: 0;
+    margin-bottom: 15px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid #333;
+    font-size: 16px;
+    text-align: center;
+}
+
+.price-comp-col.inferior h3 { color: #5cd082; }
+.price-comp-col.similar h3 { color: #4da3ff; }
+.price-comp-col.mayor h3 { color: #ff6b7b; }
+
+.price-comp-item {
+    background: #1e1e1e;
+    border: 1px solid #222;
+    padding: 10px;
+    margin-bottom: 10px;
+    border-radius: 4px;
+    font-size: 13px;
+}
+
+.price-comp-item-price {
+    font-size: 16px;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 5px;
+}
+
+.price-comp-item-source {
+    color: #aaa;
+    margin-bottom: 5px;
+    text-transform: uppercase;
+    font-size: 11px;
+}
+
+.price-comp-item a {
+    color: #00ff00;
+    text-decoration: none;
+}
+
+.price-comp-item a:hover {
+    text-decoration: underline;
+}
+
 /* Footer Styles */
 .bruiserhub-footer {
     margin-top: 40px;
     text-align: right;
-    max-width: 800px;
+    max-width: 1000px;
 }
 
 .bruiserhub-footer a {
