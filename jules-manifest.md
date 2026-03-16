@@ -50,3 +50,7 @@ Todos los endpoints residen bajo el namespace `/wp-json/bruiser/v1` y requieren 
 - **Dependencia:** Requiere que el sitio soporte Application Passwords y tenga un usuario llamado `user` con los permisos suficientes. La Application Password de este usuario debe utilizarse en los llamados.
 - **Dependencia Frontend:** Usa `wp.element` de WordPress. No se requiere compilación (Webpack/Babel) para `admin.js` en esta versión inicial.
 - **Riesgo/Conflicto:** Problemas de escritura pueden surgir si los permisos del servidor (www-data/nginx/apache) sobre el directorio `wp-content` no son suficientes.
+
+## History
+
+- **[16 Mar 2026]** Updated `price_check_handler` in `includes/api-routes.php` to improve Google Shopping Colombia results. Removed aggressive blacklisted words ('ml', 'onzas', 'oz'), updated the search query from 'parfum' to 'perfume', and made the extreme price filter dynamic (rejects if market price is < 50% of local product price instead of a hardcoded 50,000 COP difference).

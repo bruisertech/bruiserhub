@@ -329,7 +329,7 @@ class BruiserHub_API {
         // Realizar la búsqueda de Shopping en Serper (COP Location for better results)
         $url = 'https://google.serper.dev/shopping';
         $body = wp_json_encode( array(
-            'q' => $product_title . ' parfum',
+            'q' => $product_title . ' perfume',
             'gl' => 'co' // Geolocation Colombia
         ) );
 
@@ -370,7 +370,7 @@ class BruiserHub_API {
         $all_prices = array();
 
         // Lista negra de palabras clave de mercado gris/decants/piratería
-        $blacklisted_words = array( 'decant', 'muestra', 'tester', 'vial', 'fraccion', 'fracción', 'miniatura', 'imitacion', 'imitación', 'replica', 'réplica', 'ml', 'onzas', 'oz' );
+        $blacklisted_words = array( 'decant', 'muestra', 'tester', 'vial', 'fraccion', 'fracción', 'miniatura', 'imitacion', 'imitación', 'replica', 'réplica' );
 
         foreach ( $shopping_results as $item ) {
             if ( ! isset( $item['price'] ) ) continue;
@@ -400,7 +400,7 @@ class BruiserHub_API {
 
             // 2. FILTRO ANTI-PIRATERÍA/ESTAFA POR PRECIO EXTREMO (EXPERT MODE)
             // Si el perfume es MÁS DE $50,000 COP más barato que nosotros, es un anuncio falso, piratería o error. Lo descartamos.
-            if ( ( $product_price - $market_price ) > 50000 ) {
+            if ( $market_price < ( $product_price * 0.5 ) ) {
                 continue;
             }
 
