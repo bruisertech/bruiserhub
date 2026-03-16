@@ -169,9 +169,13 @@ class BruiserHub_API {
 
         $result = array();
         foreach ( $products as $product_id ) {
+            $thumbnail_id = get_post_thumbnail_id( $product_id );
+            $thumbnail_url = $thumbnail_id ? wp_get_attachment_image_url( $thumbnail_id, 'thumbnail' ) : '';
+
             $result[] = array(
                 'id'    => $product_id,
-                'title' => get_the_title( $product_id )
+                'title' => get_the_title( $product_id ),
+                'image' => $thumbnail_url
             );
         }
 
@@ -183,7 +187,12 @@ class BruiserHub_API {
      */
     public function search_images_handler( WP_REST_Request $request ) {
         $query = $request->get_param( 'query' );
-        $api_key = '2779d3b77de0f2b5d966b323fed4b8cb7da99cf3';
+        // Obtener la clave de API desde las opciones de WordPress para no exponerla en el código
+        $api_key = get_option( 'bruiserhub_serper_api_key', '' );
+
+        if ( empty( $api_key ) ) {
+            return new WP_Error( 'api_error', 'Serper API Key no configurada en la base de datos.', array( 'status' => 500 ) );
+        }
 
         $url = 'https://google.serper.dev/images';
         $body = wp_json_encode( array(

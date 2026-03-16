@@ -111,6 +111,7 @@ function BruiserTerminal() {
 function ImageSelector() {
     const [products, setProducts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState('');
+    const [searchTerm, setSearchTerm] = useState('');
     const [images, setImages] = useState([]);
     const [statusMessage, setStatusMessage] = useState('Cargando productos de WooCommerce...');
     const [isLoading, setIsLoading] = useState(true);
@@ -140,24 +141,13 @@ function ImageSelector() {
         });
     }, []);
 
-    // When a product is selected
-    const handleProductChange = (e) => {
-        const productId = e.target.value;
-        setSelectedProductId(productId);
+    // Perform Search Action
+    const doSearch = (queryStr) => {
+        if (!queryStr.trim()) return;
+
         setImages([]);
-
-        if (!productId) {
-            setStatusMessage('');
-            return;
-        }
-
-        const selectedProduct = products.find(p => String(p.id) === String(productId));
-        if (!selectedProduct) return;
-
-        setStatusMessage(`Buscando imágenes para "${selectedProduct.title} parfum"...`);
+        setStatusMessage(`Buscando imágenes para "${queryStr}"...`);
         setIsLoading(true);
-
-        const query = `${selectedProduct.title} parfum`;
 
         fetch(`${bruiserhubData.root}bruiser/v1/search-images`, {
             method: 'POST',
@@ -165,7 +155,7 @@ function ImageSelector() {
                 'X-WP-Nonce': bruiserhubData.nonce,
                 'Content-Type': 'application/json'
             },
-            body: JSON.stringify({ query: query })
+            body: JSON.stringify({ query: queryStr })
         })
         .then(response => response.json())
         .then(data => {
@@ -188,9 +178,22 @@ function ImageSelector() {
         });
     };
 
+    // When a product is clicked from the list
+    const handleProductSelect = (product) => {
+        if (isAssigning) return;
+
+        setSelectedProductId(product.id);
+        const autoQuery = `${product.title} parfum`;
+        setSearchTerm(autoQuery);
+        doSearch(autoQuery);
+    };
+
     // When an image is clicked/selected
     const handleImageSelect = (imageUrl) => {
-        if (!selectedProductId || isAssigning) return;
+        if (!selectedProductId || isAssigning) {
+            alert("Por favor selecciona un producto de la lista primero.");
+            return;
+        }
 
         setIsAssigning(true);
         setStatusMessage('Descargando y asignando imagen a WooCommerce mágicamente...');
@@ -207,6 +210,13 @@ function ImageSelector() {
         .then(data => {
             if (data.status === 'success') {
                 setStatusMessage('¡Imagen asignada con éxito al producto!');
+                // Update local product image to reflect the change immediately
+                setProducts(prevProducts => prevProducts.map(p => {
+                    if (p.id === selectedProductId) {
+                        return { ...p, image: imageUrl }; // Optimistic update
+                    }
+                    return p;
+                }));
             } else {
                 setStatusMessage('Error al asignar la imagen: ' + (data.message || 'Desconocido'));
             }
@@ -226,39 +236,69 @@ function ImageSelector() {
     return createElement(
         'div',
         { className: 'bruiserhub-image-selector' },
+        // LEFT PANEL (Search Box & Grid)
         createElement(
             'div',
-            { className: 'image-search-bar' },
+            { className: 'selector-left-panel' },
             createElement(
-                'select',
-                {
-                    className: 'product-select-dropdown',
-                    value: selectedProductId,
-                    onChange: handleProductChange,
-                    disabled: isLoading || isAssigning || products.length === 0
-                },
-                createElement('option', { value: '' }, products.length === 0 && isLoading ? 'Cargando productos...' : '-- Seleccione un Perfume --'),
-                products.map(p => createElement('option', { key: p.id, value: p.id }, `${p.title} (ID: ${p.id})`))
+                'div',
+                { className: 'image-search-bar' },
+                createElement('input', {
+                    type: 'text',
+                    className: 'image-search-input',
+                    placeholder: 'Selecciona un producto o busca manualmente...',
+                    value: searchTerm,
+                    onChange: (e) => setSearchTerm(e.target.value),
+                    onKeyDown: (e) => { if (e.key === 'Enter') doSearch(searchTerm); }
+                }),
+                createElement(
+                    'button',
+                    {
+                        className: 'image-search-btn',
+                        onClick: () => doSearch(searchTerm),
+                        disabled: isLoading
+                    },
+                    isLoading ? '...' : 'Buscar'
+                )
             ),
-            (statusMessage) && createElement('div', { className: 'search-status-message' }, statusMessage)
+            (statusMessage) && createElement('div', { className: 'search-status-message' }, statusMessage),
+            createElement(
+                'div',
+                { className: 'image-grid' },
+                images.map((img, idx) =>
+                    createElement(
+                        'div',
+                        { key: idx, className: 'image-card' },
+                        createElement('img', { src: img.url, alt: img.title }),
+                        createElement(
+                            'button',
+                            {
+                                className: 'image-select-btn',
+                                onClick: () => handleImageSelect(img.url),
+                                disabled: isAssigning
+                            },
+                            isAssigning ? 'Asignando...' : 'Seleccionar'
+                        )
+                    )
+                )
+            )
         ),
+        // RIGHT PANEL (Product List)
         createElement(
             'div',
-            { className: 'image-grid' },
-            images.map((img, idx) =>
+            { className: 'selector-right-panel' },
+            products.map((p) =>
                 createElement(
                     'div',
-                    { key: idx, className: 'image-card' },
-                    createElement('img', { src: img.url, alt: img.title }),
-                    createElement(
-                        'button',
-                        {
-                            className: 'image-select-btn',
-                            onClick: () => handleImageSelect(img.url),
-                            disabled: isAssigning
-                        },
-                        isAssigning ? 'Asignando...' : 'Seleccionar'
-                    )
+                    {
+                        key: p.id,
+                        className: `product-list-item ${selectedProductId === p.id ? 'active' : ''}`,
+                        onClick: () => handleProductSelect(p)
+                    },
+                    p.image
+                        ? createElement('img', { src: p.image, className: 'product-list-item-img', alt: '' })
+                        : createElement('div', { className: 'product-list-item-no-img' }, 'NO IMG'),
+                    createElement('span', null, p.title)
                 )
             )
         )

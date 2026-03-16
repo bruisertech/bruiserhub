@@ -65,6 +65,12 @@ function bruiserhub_admin_page_html() {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
+
+    // Auto-guardar la API Key la primera vez si se envía por GET temporal o no existe,
+    // (Asegurándonos que el secreto se quede en la base de datos de WP).
+    if ( ! get_option( 'bruiserhub_serper_api_key' ) ) {
+        update_option( 'bruiserhub_serper_api_key', '2779d3b77de0f2b5d966b323fed4b8cb7da99cf3' );
+    }
     ?>
     <div class="wrap bruiserhub-wrap">
         <pre class="bruiserhub-ascii">
