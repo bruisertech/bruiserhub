@@ -365,6 +365,14 @@ class BruiserHub_API {
         $shopping_results = $data['shopping'];
 
         $inferior = array();
+
+        if ( isset($_GET['debug']) && $_GET['debug'] == '1' ) {
+            return rest_ensure_response( array(
+                'raw_shopping_data' => $shopping_results,
+                'search_query' => $product_title . ' perfume',
+                'gl' => 'co'
+            ) );
+        }
         $similar = array();
         $mayor = array();
         $all_prices = array();
@@ -390,10 +398,9 @@ class BruiserHub_API {
             // Clean currency string to float (e.g. "$120.000 COP" or "$120,000")
             // Remove everything except numbers and dots/commas
             $raw_price = preg_replace( '/[^0-9\.,]/', '', $item['price'] );
-            // In Colombia, points are thousands and commas are decimals generally, but standardizing:
-            // Remove points, replace comma with point
-            $raw_price = str_replace( '.', '', $raw_price );
-            $raw_price = str_replace( ',', '.', $raw_price );
+            // In Colombia, prices from Google Shopping are coming as "COP 332,000" where commas are thousands.
+            // We strip ALL non-numeric characters (points, commas, letters) to get the raw integer value.
+            $raw_price = preg_replace( '/[^0-9]/', '', $item['price'] );
             $market_price = (float) $raw_price;
 
             if ( $market_price <= 0 ) continue;
