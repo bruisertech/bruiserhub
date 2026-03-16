@@ -113,32 +113,48 @@
     display: block;
     margin-top: 4px;
     margin-bottom: 12px;
+    white-space: pre-wrap; /* Keeps multiline formatting */
+    font-family: inherit;
+    margin: 0;
+    padding-bottom: 12px;
 }
 
 .terminal-prompt {
-    color: #00ff00;
     margin-right: 8px;
 }
 
 .terminal-cursor {
-    color: #fff;
     transition: opacity 0.1s ease-in-out;
 }
 
-.terminal-input {
+/* True Mac Terminal Input Overlay */
+.terminal-input-container {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.terminal-visible-text {
+    white-space: pre;
+}
+
+.terminal-hidden-input {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    opacity: 0;
+    cursor: text;
     background: transparent !important;
     border: none !important;
-    color: transparent !important; /* The text will be rendered visually by our span system or color: #00ff00 !important; */
-    color: #00ff00 !important;
+    color: transparent !important;
     font-family: inherit !important;
     font-size: inherit !important;
-    flex-grow: 1;
     outline: none !important;
     box-shadow: none !important;
     margin: 0 !important;
     padding: 0 !important;
-    line-height: inherit !important;
-    height: auto !important;
 }
 
 /* Image Selector Styles */

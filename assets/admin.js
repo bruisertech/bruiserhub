@@ -7,6 +7,7 @@ function BruiserTerminal() {
     const [cursorVisible, setCursorVisible] = useState(true);
     const [history, setHistory] = useState([]);
     const [inputValue, setInputValue] = useState('');
+    const [terminalColor, setTerminalColor] = useState('#00ff00');
     const inputRef = useRef(null);
     const bodyRef = useRef(null);
 
@@ -31,19 +32,98 @@ function BruiserTerminal() {
         }
     };
 
+    const handleCommand = async (command) => {
+        const lowerCmd = command.toLowerCase().trim();
+        const args = lowerCmd.split(' ');
+        const baseCmd = args[0];
+
+        let response = '';
+
+        if (baseCmd === 'help') {
+            response = 'Available commands:\n' +
+                       '  time    - Shows current server time\n' +
+                       '  count   - Counts total WooCommerce products\n' +
+                       '  color   - Changes terminal color (e.g. color red, color #00ff00)\n' +
+                       '  clear   - Clears the terminal screen\n' +
+                       '  ping    - Pings the server\n' +
+                       '  whoami  - Displays current user context\n' +
+                       '  status  - Shows system status';
+        } else if (baseCmd === 'ayuda') {
+            response = 'Comandos disponibles:\n' +
+                       '  hora    - Muestra la hora actual del servidor\n' +
+                       '  cantidad- Cuenta el total de productos de WooCommerce\n' +
+                       '  color   - Cambia el color de la terminal (ej: color red, color #00ff00)\n' +
+                       '  limpiar - Limpia la pantalla de la terminal\n' +
+                       '  ping    - Hace ping al servidor\n' +
+                       '  quiensoy- Muestra el contexto del usuario actual\n' +
+                       '  estado  - Muestra el estado del sistema';
+        } else if (baseCmd === 'time' || baseCmd === 'hora') {
+            response = new Date().toLocaleString();
+        } else if (baseCmd === 'clear' || baseCmd === 'limpiar') {
+            setHistory([]);
+            return; // Exit early so we don't add the command to history after clearing
+        } else if (baseCmd === 'ping') {
+            response = 'PONG!';
+        } else if (baseCmd === 'whoami' || baseCmd === 'quiensoy') {
+            response = 'root (simulated) - BRUISER HUB Administrator';
+        } else if (baseCmd === 'status' || baseCmd === 'estado') {
+            response = 'System: Online\nAPI: Connected\nWooCommerce: Active\nSerper: Ready';
+        } else if (baseCmd === 'color') {
+            if (args[1]) {
+                setTerminalColor(args[1]);
+                response = `Terminal color set to ${args[1]}`;
+            } else {
+                response = 'Usage: color [color_name_or_hex]\nUso: color [nombre_o_hex]';
+            }
+        } else if (baseCmd === 'count' || baseCmd === 'cantidad') {
+            // Async API Call
+            setHistory((prev) => [
+                ...prev,
+                { type: 'command', text: command, color: terminalColor },
+                { type: 'response', text: 'Counting products in WooCommerce database...' }
+            ]);
+
+            try {
+                const res = await fetch(`${bruiserhubData.root}bruiser/v1/products`, {
+                    headers: { 'X-WP-Nonce': bruiserhubData.nonce }
+                });
+                const data = await res.json();
+
+                if (Array.isArray(data)) {
+                    setHistory((prev) => [
+                        ...prev,
+                        { type: 'response', text: `Result: ${data.length} published products found.` }
+                    ]);
+                } else {
+                    throw new Error('Invalid response');
+                }
+            } catch (err) {
+                setHistory((prev) => [
+                    ...prev,
+                    { type: 'response', text: 'Error fetching products from database.' }
+                ]);
+            }
+            return; // Handled asynchronously
+        } else {
+            response = "type help for help in english, escribe ayuda para ayuda en español\ncontact developer WhatsApp: '573053862774";
+        }
+
+        setHistory((prev) => [
+            ...prev,
+            { type: 'command', text: command, color: terminalColor },
+            { type: 'response', text: response, multiline: true }
+        ]);
+    };
+
     const handleKeyDown = (e) => {
         if (e.key === 'Enter') {
             const command = inputValue.trim();
             if (command) {
-                setHistory((prev) => [
-                    ...prev,
-                    { type: 'command', text: command },
-                    { type: 'response', text: 'command not found, contact the coder on WhatsApp 3053862774' }
-                ]);
+                handleCommand(command);
             } else {
                 setHistory((prev) => [
                     ...prev,
-                    { type: 'command', text: '' }
+                    { type: 'command', text: '', color: terminalColor }
                 ]);
             }
             setInputValue('');
@@ -69,40 +149,45 @@ function BruiserTerminal() {
                     return createElement(
                         'div',
                         { key: index, className: 'terminal-line' },
-                        createElement('span', { className: 'terminal-prompt' }, 'bruiser@lhparfum:~$ '),
-                        createElement('span', null, item.text)
+                        createElement('span', { className: 'terminal-prompt', style: { color: item.color || terminalColor } }, 'bruiser@lhparfum:~$ '),
+                        createElement('span', { style: { color: item.color || terminalColor } }, item.text)
                     );
                 } else {
                     return createElement(
-                        'div',
+                        'pre',
                         { key: index, className: 'terminal-response' },
                         item.text
                     );
                 }
             }),
-            // Current Input Line
+            // Current Input Line (True Mac Terminal style)
             createElement(
                 'div',
-                { className: 'terminal-line' },
-                createElement('span', { className: 'terminal-prompt' }, 'bruiser@lhparfum:~$ '),
+                { className: 'terminal-line terminal-input-container', style: { color: terminalColor } },
+                createElement('span', { className: 'terminal-prompt', style: { color: terminalColor } }, 'bruiser@lhparfum:~$ '),
+
+                // Visible text span exactly followed by cursor
+                createElement('span', { className: 'terminal-visible-text' }, inputValue),
+                createElement(
+                    'span',
+                    {
+                        className: 'terminal-cursor',
+                        style: { opacity: cursorVisible ? 1 : 0, color: terminalColor }
+                    },
+                    '█'
+                ),
+
+                // Hidden invisible input taking the keystrokes over the whole line
                 createElement('input', {
                     ref: inputRef,
                     type: 'text',
-                    className: 'terminal-input',
+                    className: 'terminal-hidden-input',
                     value: inputValue,
                     onChange: (e) => setInputValue(e.target.value),
                     onKeyDown: handleKeyDown,
                     spellCheck: false,
                     autoComplete: "off"
-                }),
-                createElement(
-                    'span',
-                    {
-                        className: 'terminal-cursor',
-                        style: { opacity: cursorVisible && !inputValue ? 1 : 0, marginLeft: '-1ch', pointerEvents: 'none' }
-                    },
-                    '█'
-                )
+                })
             )
         )
     );

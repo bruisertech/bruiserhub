@@ -32,7 +32,7 @@ Todos los endpoints residen bajo el namespace `/wp-json/bruiser/v1` y requieren 
 - **`bruiserhub_register_admin_menu()`**: Registra la página en el menú de WordPress con el título "🔥 BRUISER HUB" y un ícono SVG de fuego color gris nativo.
 - **`bruiserhub_admin_enqueue_scripts()`**: Encola `wp-element` (React nativo de WP), `admin.js` y `admin.css`.
 - **`BruiserHubApp` (React)**: Componente principal que administra las pestañas entre `BruiserTerminal` e `ImageSelector`.
-- **`BruiserTerminal` (React)**: Consola de inyección base64 realista estilo Mac, fondo transparente, cursor siempre activo, respuesta hardcodeada.
+- **`BruiserTerminal` (React)**: Motor interactivo de comandos simulado estilo Mac. Maneja un historial en array (inputs + respuestas asíncronas). Soporta comandos como `help/ayuda`, `hora/time`, `count/cantidad` (usando la REST API para WooCommerce), y permite cambiar colores dinámicamente (`color #hex`).
 - **`ImageSelector` (React)**: Interfaz de 2 clics para WooCommerce. Lee productos (`/products`), dispara búsqueda en Serper al seleccionar producto (`/search-images`), y asigna la imagen cliqueada directamente (`/set-product-image`).
 - **`BruiserHub_API::get_products_handler()`**: Controlador para listar productos WP/WC.
 - **`BruiserHub_API::search_images_handler()`**: Controlador Proxy para Serper (Usa API Key 2779d3b77de0f2b5d966b323fed4b8cb7da99cf3 de Daniel).
