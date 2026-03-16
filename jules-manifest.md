@@ -56,3 +56,5 @@ Todos los endpoints residen bajo el namespace `/wp-json/bruiser/v1` y requieren 
 - **[16 Mar 2026]** Updated `price_check_handler` in `includes/api-routes.php` to improve Google Shopping Colombia results. Removed aggressive blacklisted words ('ml', 'onzas', 'oz'), updated the search query from 'parfum' to 'perfume', and made the extreme price filter dynamic (rejects if market price is < 50% of local product price instead of a hardcoded 50,000 COP difference).
 
 - **[16 Mar 2026]** Fixed critical price string parsing bug in `price_check_handler`. Strings like 'COP 332,000' were converting to '332.0' due to comma replacement. Replaced with strict numeric regex stripping `preg_replace('/[^0-9]/', '', $price)` to correctly output '332000'.
+
+- **[16 Mar 2026]** Added `update_price_handler` endpoint (`POST /update-price`) in `includes/api-routes.php` to securely modify WooCommerce prices. Updated React UI (`assets/admin.js`) to display product header details (image, name, formatted price without HTML tags) and added a direct WooCommerce price adjustment panel to the Price Comparator.

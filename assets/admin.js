@@ -432,9 +432,12 @@ function ImageSelector() {
 function PriceComparator() {
     const [products, setProducts] = useState([]);
     const [selectedProductId, setSelectedProductId] = useState('');
+    const [selectedProductData, setSelectedProductData] = useState(null);
     const [report, setReport] = useState(null);
     const [statusMessage, setStatusMessage] = useState('Cargando productos...');
     const [isLoading, setIsLoading] = useState(true);
+    const [newPrice, setNewPrice] = useState('');
+    const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
 
     // Initial load: Fetch WooCommerce products (Reusing the same endpoint)
     useEffect(() => {
@@ -462,6 +465,7 @@ function PriceComparator() {
         if (isLoading) return;
 
         setSelectedProductId(product.id);
+        setSelectedProductData(product);
         setReport(null);
         setStatusMessage(`Analizando mercado para "${product.title}"...`);
         setIsLoading(true);
@@ -484,12 +488,44 @@ function PriceComparator() {
             }
 
             setReport(data);
+            setNewPrice(data.local_price); // Pre-fill current price
             setStatusMessage('');
             setIsLoading(false);
         })
         .catch(error => {
             setStatusMessage('Error al consultar el mercado.');
             setIsLoading(false);
+        });
+    };
+
+    const handlePriceUpdate = () => {
+        if (!selectedProductId || !newPrice) return;
+
+        setIsUpdatingPrice(true);
+        setStatusMessage('Actualizando precio en WooCommerce...');
+
+        fetch(`${bruiserhubData.root}bruiser/v1/update-price`, {
+            method: 'POST',
+            headers: {
+                'X-WP-Nonce': bruiserhubData.nonce,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ product_id: parseInt(selectedProductId), price: parseFloat(newPrice) })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                setStatusMessage('¡Precio actualizado con éxito! Recargando comparador...');
+                // Refresh the report to show new local price and margins
+                handleProductSelect(selectedProductData);
+            } else {
+                setStatusMessage('Error al actualizar: ' + (data.message || 'Desconocido'));
+            }
+            setIsUpdatingPrice(false);
+        })
+        .catch(error => {
+            setStatusMessage('Error crítico al actualizar el precio.');
+            setIsUpdatingPrice(false);
         });
     };
 
@@ -518,10 +554,49 @@ function PriceComparator() {
             report && createElement(
                 'div',
                 null,
+                // NUEVA CABECERA DE PRODUCTO
+                createElement(
+                    'div',
+                    { className: 'price-comp-product-header', style: { display: 'flex', alignItems: 'center', background: '#2c2c2c', padding: '15px', borderRadius: '8px', marginBottom: '20px' } },
+                    selectedProductData?.image ? createElement('img', { src: selectedProductData.image, style: { width: '80px', height: '80px', objectFit: 'cover', borderRadius: '4px', marginRight: '20px' } }) : createElement('div', { style: { width: '80px', height: '80px', background: '#444', marginRight: '20px', borderRadius: '4px'} }),
+                    createElement(
+                        'div',
+                        null,
+                        createElement('h2', { style: { margin: '0 0 10px 0', color: '#fff' } }, selectedProductData?.title),
+                        createElement('div', { style: { fontSize: '18px', color: '#00ff00', fontWeight: 'bold' } }, `Precio Actual: ${report.local_price_formatted.replace(/<[^>]*>?/gm, '')}`) // Strip HTML just in case
+                    )
+                ),
+                // ALERTA
                 createElement(
                     'div',
                     { className: `price-comp-alert ${report.alert_color}` },
                     report.alert_message
+                ),
+                // PANEL DE ACTUALIZACIÓN DE PRECIO WOOCOMMERCE
+                createElement(
+                    'div',
+                    { className: 'price-comp-update-panel', style: { marginTop: '20px', padding: '15px', background: '#1e1e1e', borderRadius: '8px', borderLeft: '4px solid #00ff00' } },
+                    createElement('h3', { style: { margin: '0 0 10px 0', color: '#fff' } }, 'Ajustar Precio Manualmente'),
+                    createElement(
+                        'div',
+                        { style: { display: 'flex', gap: '10px' } },
+                        createElement('input', {
+                            type: 'number',
+                            value: newPrice,
+                            onChange: (e) => setNewPrice(e.target.value),
+                            placeholder: 'Nuevo precio...',
+                            style: { padding: '8px', borderRadius: '4px', border: '1px solid #444', background: '#333', color: '#fff', flex: '1' }
+                        }),
+                        createElement(
+                            'button',
+                            {
+                                onClick: handlePriceUpdate,
+                                disabled: isUpdatingPrice,
+                                style: { padding: '8px 16px', background: '#00ff00', color: '#000', border: 'none', borderRadius: '4px', cursor: 'pointer', fontWeight: 'bold' }
+                            },
+                            isUpdatingPrice ? 'Guardando...' : 'Actualizar WooCommerce'
+                        )
+                    )
                 ),
                 createElement(
                     'div',

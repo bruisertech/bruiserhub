@@ -74,6 +74,23 @@ class BruiserHub_API {
             )
         ) );
 
+        // Endpoint para actualizar el precio del producto (WooCommerce)
+        register_rest_route( $this->namespace, '/update-price', array(
+            'methods'  => 'POST',
+            'callback' => array( $this, 'update_price_handler' ),
+            'permission_callback' => array( $this, 'check_permissions' ),
+            'args'     => array(
+                'product_id' => array(
+                    'required' => true,
+                    'type'     => 'integer'
+                ),
+                'price' => array(
+                    'required' => true,
+                    'type'     => 'number'
+                )
+            )
+        ) );
+
         // Endpoint de Comparador de Precios (Serper Shopping API)
         register_rest_route( $this->namespace, '/price-check', array(
             'methods'  => 'GET',
@@ -458,12 +475,16 @@ class BruiserHub_API {
 
         $avg_diff_percentage = ( ( $product_price - $market_average ) / $market_average ) * 100;
 
+        // Use strip_tags and html_entity_decode so React doesn't render HTML string literals or entities like &#36;
+        $formatted_local = html_entity_decode( strip_tags( wc_price($product_price) ), ENT_QUOTES, 'UTF-8' );
+        $formatted_market = html_entity_decode( strip_tags( wc_price($market_average) ), ENT_QUOTES, 'UTF-8' );
+
         if ( $avg_diff_percentage > 5 ) {
             $alert_color = 'red'; // Somos más caros
-            $alert_message = 'ALERTA ROJA: Nuestro precio (' . wc_price($product_price) . ') es SUPERIOR al promedio del mercado (' . wc_price($market_average) . ').';
+            $alert_message = 'ALERTA ROJA: Nuestro precio (' . $formatted_local . ') es SUPERIOR al promedio del mercado (' . $formatted_market . ').';
         } else if ( $avg_diff_percentage < -5 ) {
             $alert_color = 'green'; // Somos más baratos
-            $alert_message = 'ALERTA VERDE: Nuestro precio (' . wc_price($product_price) . ') es INFERIOR al mercado (' . wc_price($market_average) . '). Excelente competitividad.';
+            $alert_message = 'ALERTA VERDE: Nuestro precio (' . $formatted_local . ') es INFERIOR al mercado (' . $formatted_market . '). Excelente competitividad.';
         }
 
         return rest_ensure_response( array(
@@ -493,6 +514,37 @@ class BruiserHub_API {
             // update_option returns false if the value is the same as the existing one.
             return rest_ensure_response( array( 'status' => 'success', 'message' => 'Serper API Key is already set to this value.' ) );
         }
+    }
+
+    /**
+     * Update Product Price Handler (WooCommerce)
+     */
+    public function update_price_handler( WP_REST_Request $request ) {
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            return new WP_Error( 'no_woocommerce', 'WooCommerce is not installed or active.', array( 'status' => 500 ) );
+        }
+
+        $product_id = $request->get_param( 'product_id' );
+        $price = $request->get_param( 'price' );
+
+        $product = wc_get_product( $product_id );
+
+        if ( ! $product ) {
+            return new WP_Error( 'invalid_product', 'Product not found.', array( 'status' => 404 ) );
+        }
+
+        // Set the new regular price and price
+        $product->set_regular_price( $price );
+        $product->set_price( $price );
+        $product->save();
+
+        return rest_ensure_response( array(
+            'status' => 'success',
+            'product_id' => $product_id,
+            'new_price' => $price,
+            'new_price_formatted' => strip_tags( wc_price($price) ),
+            'message' => 'Price updated successfully.'
+        ) );
     }
 
     /**
