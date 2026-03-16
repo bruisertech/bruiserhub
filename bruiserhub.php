@@ -30,7 +30,7 @@ function bruiserhub_register_admin_menu() {
         'manage_options',
         'bruiserhub-console',
         'bruiserhub_admin_page_html',
-        'dashicons-terminal',
+        'data:image/svg+xml;base64,' . base64_encode('<svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M12 2C12 2 8 6 8 10C8 12.2091 9.79086 14 12 14C14.2091 14 16 12.2091 16 10C16 6 12 2 12 2Z" fill="#a0a5aa"/><path d="M15.5 8C17.5 10 19 12 19 15C19 18.866 15.866 22 12 22C8.13401 22 5 18.866 5 15C5 11 8 8 8 8C8 8 7 10 7 12C7 14 8 16 10 17C10 17 11 15 12 15C13 15 14 17 14 17C16 16 16.5 13 16.5 13C16.5 13 16 11 15.5 8Z" fill="#a0a5aa"/></svg>'),
         2
     );
 }

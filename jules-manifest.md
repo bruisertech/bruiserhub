@@ -26,7 +26,7 @@ Todos los endpoints residen bajo el namespace `/wp-json/bruiser/v1` y requieren 
 
 ## 3. Diccionario de Funciones Principales
 
-- **`bruiserhub_register_admin_menu()`**: Registra la página en el menú de WordPress con el título "🔥 BRUISER HUB".
+- **`bruiserhub_register_admin_menu()`**: Registra la página en el menú de WordPress con el título "🔥 BRUISER HUB" y un ícono SVG de fuego color gris nativo.
 - **`bruiserhub_admin_enqueue_scripts()`**: Encola `wp-element` (React nativo de WP), `admin.js` y `admin.css`.
 - **`BruiserHub_API::check_permissions()`**: Validador CRÍTICO de seguridad. Comprueba `is_user_logged_in()` y que el `user_login` actual sea exactamente `user`.
 - **`BruiserHub_API::validate_path()`**: Filtro de seguridad que previene retrocesos de directorio (`..`) y garantiza resoluciones dentro de `WP_CONTENT_DIR`.
