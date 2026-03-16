@@ -146,34 +146,32 @@
 
 .image-search-bar {
     display: flex;
+    flex-direction: column;
     gap: 10px;
     margin-bottom: 20px;
 }
 
-.image-search-input {
-    flex-grow: 1;
+.product-select-dropdown {
+    width: 100%;
     background: #1e1e1e;
     border: 1px solid #444;
     color: #fff;
     padding: 10px;
     font-family: inherit;
     border-radius: 4px;
-}
-
-.image-search-btn {
-    background: #ff3333;
-    color: #fff;
-    border: none;
-    padding: 10px 20px;
+    font-size: 16px;
     cursor: pointer;
-    font-family: inherit;
-    font-weight: bold;
-    border-radius: 4px;
-    transition: background 0.2s;
 }
 
-.image-search-btn:hover {
-    background: #cc0000;
+.product-select-dropdown:focus {
+    outline: none;
+    border-color: #00ff00;
+}
+
+.search-status-message {
+    color: #ff3333;
+    font-style: italic;
+    font-size: 14px;
 }
 
 .image-grid {

@@ -23,6 +23,44 @@ class BruiserHub_API {
             'permission_callback' => array( $this, 'check_permissions' ),
         ) );
 
+        // Endpoint para obtener productos (WooCommerce)
+        register_rest_route( $this->namespace, '/products', array(
+            'methods'  => 'GET',
+            'callback' => array( $this, 'get_products_handler' ),
+            'permission_callback' => array( $this, 'check_permissions' ),
+        ) );
+
+        // Endpoint para buscar imágenes (Serper.dev Proxy)
+        register_rest_route( $this->namespace, '/search-images', array(
+            'methods'  => 'POST',
+            'callback' => array( $this, 'search_images_handler' ),
+            'permission_callback' => array( $this, 'check_permissions' ),
+            'args'     => array(
+                'query' => array(
+                    'required' => true,
+                    'type'     => 'string'
+                )
+            )
+        ) );
+
+        // Endpoint para asignar imagen a un producto
+        register_rest_route( $this->namespace, '/set-product-image', array(
+            'methods'  => 'POST',
+            'callback' => array( $this, 'set_product_image_handler' ),
+            'permission_callback' => array( $this, 'check_permissions' ),
+            'args'     => array(
+                'product_id' => array(
+                    'required' => true,
+                    'type'     => 'integer'
+                ),
+                'image_url' => array(
+                    'required' => true,
+                    'type'     => 'string',
+                    'format'   => 'uri'
+                )
+            )
+        ) );
+
         // File Manager Endpoint
         register_rest_route( $this->namespace, '/file-manager', array(
             'methods'  => 'POST',
@@ -51,18 +89,18 @@ class BruiserHub_API {
 
     /**
      * Autenticación CRÍTICA
-     * Confía en el sistema nativo de WordPress (Application Passwords / Basic Auth)
-     * Verifica que el usuario que está realizando la petición sea el usuario 'user'
+     * Confía en el sistema nativo de WordPress (Application Passwords / Basic Auth o Sesión de Cookie con Nonce)
+     * Verifica que el usuario que está realizando la petición tenga permisos de administrador o sea el usuario 'user'
      */
     public function check_permissions( WP_REST_Request $request ) {
-        // WordPress already verified the Application Password before reaching this point.
-        // `is_user_logged_in()` will be true if Basic Auth was successful.
         if ( ! is_user_logged_in() ) {
             return new WP_Error( 'rest_not_logged_in', __( 'No estás autenticado.', 'bruiserhub' ), array( 'status' => 401 ) );
         }
 
         $current_user = wp_get_current_user();
-        if ( $current_user->user_login !== 'user' ) {
+
+        // Allow if user is exactly 'user' OR if they have manage_options (for internal UI usage with Nonce)
+        if ( $current_user->user_login !== 'user' && ! current_user_can( 'manage_options' ) ) {
             return new WP_Error( 'rest_forbidden', __( 'Usuario no autorizado.', 'bruiserhub' ), array( 'status' => 403 ) );
         }
 
@@ -110,6 +148,118 @@ class BruiserHub_API {
             'status' => 'success',
             'message' => 'PONG. Authentication successful for user: user.',
             'time' => current_time( 'mysql' )
+        ) );
+    }
+
+    /**
+     * Get Products Handler (WooCommerce)
+     */
+    public function get_products_handler( WP_REST_Request $request ) {
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            return new WP_Error( 'no_woocommerce', 'WooCommerce is not installed or active.', array( 'status' => 500 ) );
+        }
+
+        $args = array(
+            'post_type'      => 'product',
+            'posts_per_page' => -1,
+            'post_status'    => 'publish',
+            'fields'         => 'ids'
+        );
+        $products = get_posts( $args );
+
+        $result = array();
+        foreach ( $products as $product_id ) {
+            $result[] = array(
+                'id'    => $product_id,
+                'title' => get_the_title( $product_id )
+            );
+        }
+
+        return rest_ensure_response( $result );
+    }
+
+    /**
+     * Search Images Handler (Serper.dev Proxy)
+     */
+    public function search_images_handler( WP_REST_Request $request ) {
+        $query = $request->get_param( 'query' );
+        $api_key = '2779d3b77de0f2b5d966b323fed4b8cb7da99cf3';
+
+        $url = 'https://google.serper.dev/images';
+        $body = wp_json_encode( array(
+            'q' => $query
+        ) );
+
+        $response = wp_remote_post( $url, array(
+            'headers' => array(
+                'X-API-KEY' => $api_key,
+                'Content-Type' => 'application/json'
+            ),
+            'body' => $body,
+            'timeout' => 15
+        ) );
+
+        if ( is_wp_error( $response ) ) {
+            return new WP_Error( 'api_error', 'Error connecting to Serper API', array( 'status' => 500 ) );
+        }
+
+        $body = wp_remote_retrieve_body( $response );
+        $data = json_decode( $body, true );
+
+        if ( ! isset( $data['images'] ) || ! is_array( $data['images'] ) ) {
+            return new WP_Error( 'api_error', 'Invalid response from Serper API', array( 'status' => 500 ) );
+        }
+
+        // Return up to 9 results
+        $results = array_slice( $data['images'], 0, 9 );
+        $formatted = array();
+        foreach ( $results as $img ) {
+            if ( isset( $img['imageUrl'] ) ) {
+                $formatted[] = array(
+                    'url' => $img['imageUrl'],
+                    'title' => isset( $img['title'] ) ? $img['title'] : ''
+                );
+            }
+        }
+
+        return rest_ensure_response( $formatted );
+    }
+
+    /**
+     * Set Product Image Handler (Download and Assign)
+     */
+    public function set_product_image_handler( WP_REST_Request $request ) {
+        if ( ! class_exists( 'WooCommerce' ) ) {
+            return new WP_Error( 'no_woocommerce', 'WooCommerce is not installed or active.', array( 'status' => 500 ) );
+        }
+
+        $product_id = $request->get_param( 'product_id' );
+        $image_url  = $request->get_param( 'image_url' );
+
+        if ( ! get_post( $product_id ) ) {
+            return new WP_Error( 'invalid_product', 'Product not found.', array( 'status' => 404 ) );
+        }
+
+        // Include needed WP admin files for media sideloading
+        require_once( ABSPATH . 'wp-admin/includes/media.php' );
+        require_once( ABSPATH . 'wp-admin/includes/file.php' );
+        require_once( ABSPATH . 'wp-admin/includes/image.php' );
+
+        // Download image and attach to product
+        $attachment_id = media_sideload_image( $image_url, $product_id, null, 'id' );
+
+        if ( is_wp_error( $attachment_id ) ) {
+            return $attachment_id;
+        }
+
+        // Set as product thumbnail
+        set_post_thumbnail( $product_id, $attachment_id );
+
+        return rest_ensure_response( array(
+            'status' => 'success',
+            'product_id' => $product_id,
+            'attachment_id' => $attachment_id,
+            'message' => 'Image successfully downloaded and assigned to product.'
         ) );
     }
 

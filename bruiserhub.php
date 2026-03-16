@@ -49,6 +49,12 @@ function bruiserhub_admin_enqueue_scripts( $hook ) {
 
     // Using wp-element which is WordPress's abstraction over React and ReactDOM
     wp_enqueue_script( 'bruiserhub-admin-script', BRUISERHUB_PLUGIN_URL . 'assets/admin.js', array( 'wp-element' ), BRUISERHUB_VERSION, true );
+
+    // Localize script to pass nonce and API URL securely
+    wp_localize_script( 'bruiserhub-admin-script', 'bruiserhubData', array(
+        'root'  => esc_url_raw( rest_url() ),
+        'nonce' => wp_create_nonce( 'wp_rest' )
+    ) );
 }
 add_action( 'admin_enqueue_scripts', 'bruiserhub_admin_enqueue_scripts' );
 

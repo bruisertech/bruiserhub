@@ -109,28 +109,118 @@ function BruiserTerminal() {
 }
 
 function ImageSelector() {
-    const [searchTerm, setSearchTerm] = useState('');
+    const [products, setProducts] = useState([]);
+    const [selectedProductId, setSelectedProductId] = useState('');
     const [images, setImages] = useState([]);
-    const [isSearching, setIsSearching] = useState(false);
+    const [statusMessage, setStatusMessage] = useState('Cargando productos de WooCommerce...');
+    const [isLoading, setIsLoading] = useState(true);
+    const [isAssigning, setIsAssigning] = useState(false);
 
-    const handleSearch = () => {
-        if (!searchTerm.trim()) return;
-        setIsSearching(true);
+    // Initial load: Fetch WooCommerce products
+    useEffect(() => {
+        fetch(`${bruiserhubData.root}bruiser/v1/products`, {
+            headers: {
+                'X-WP-Nonce': bruiserhubData.nonce
+            }
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.code && data.message) {
+                setStatusMessage('Error: ' + data.message);
+                setIsLoading(false);
+                return;
+            }
+            setProducts(data);
+            setStatusMessage('');
+            setIsLoading(false);
+        })
+        .catch(error => {
+            setStatusMessage('Error cargando productos.');
+            setIsLoading(false);
+        });
+    }, []);
 
-        // Simular búsqueda (Prototipo - En producción usarías una API real de Bing o similar)
-        // Agregamos el término "parfum" al final como fue requerido
-        const query = `${searchTerm.trim()} parfum`;
+    // When a product is selected
+    const handleProductChange = (e) => {
+        const productId = e.target.value;
+        setSelectedProductId(productId);
+        setImages([]);
 
-        setTimeout(() => {
-            // Mock images representing Bing search results
-            const mockResults = Array(9).fill(null).map((_, i) => ({
-                id: i,
-                url: `https://picsum.photos/seed/${encodeURIComponent(query)}${i}/300/300`,
-                title: `${query} result ${i + 1}`
-            }));
-            setImages(mockResults);
-            setIsSearching(false);
-        }, 1000);
+        if (!productId) {
+            setStatusMessage('');
+            return;
+        }
+
+        const selectedProduct = products.find(p => String(p.id) === String(productId));
+        if (!selectedProduct) return;
+
+        setStatusMessage(`Buscando imágenes para "${selectedProduct.title} parfum"...`);
+        setIsLoading(true);
+
+        const query = `${selectedProduct.title} parfum`;
+
+        fetch(`${bruiserhubData.root}bruiser/v1/search-images`, {
+            method: 'POST',
+            headers: {
+                'X-WP-Nonce': bruiserhubData.nonce,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ query: query })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.code && data.message) {
+                setStatusMessage('Error: ' + data.message);
+                setIsLoading(false);
+                return;
+            }
+            if (!Array.isArray(data) || data.length === 0) {
+                 setStatusMessage('No se encontraron imágenes en alta calidad.');
+            } else {
+                 setImages(data);
+                 setStatusMessage('');
+            }
+            setIsLoading(false);
+        })
+        .catch(error => {
+            setStatusMessage('Error buscando imágenes.');
+            setIsLoading(false);
+        });
+    };
+
+    // When an image is clicked/selected
+    const handleImageSelect = (imageUrl) => {
+        if (!selectedProductId || isAssigning) return;
+
+        setIsAssigning(true);
+        setStatusMessage('Descargando y asignando imagen a WooCommerce mágicamente...');
+
+        fetch(`${bruiserhubData.root}bruiser/v1/set-product-image`, {
+            method: 'POST',
+            headers: {
+                'X-WP-Nonce': bruiserhubData.nonce,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ product_id: parseInt(selectedProductId), image_url: imageUrl })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.status === 'success') {
+                setStatusMessage('¡Imagen asignada con éxito al producto!');
+            } else {
+                setStatusMessage('Error al asignar la imagen: ' + (data.message || 'Desconocido'));
+            }
+            setIsAssigning(false);
+
+            // Clear success message after 3 seconds
+            setTimeout(() => {
+                setStatusMessage('');
+            }, 3000);
+        })
+        .catch(error => {
+            setStatusMessage('Error fatal al asignar la imagen.');
+            setIsAssigning(false);
+        });
     };
 
     return createElement(
@@ -139,35 +229,35 @@ function ImageSelector() {
         createElement(
             'div',
             { className: 'image-search-bar' },
-            createElement('input', {
-                type: 'text',
-                className: 'image-search-input',
-                placeholder: 'Buscar nombre y marca del producto (auto-añade "parfum")...',
-                value: searchTerm,
-                onChange: (e) => setSearchTerm(e.target.value),
-                onKeyDown: (e) => { if (e.key === 'Enter') handleSearch(); }
-            }),
             createElement(
-                'button',
-                { className: 'image-search-btn', onClick: handleSearch, disabled: isSearching },
-                isSearching ? 'Buscando...' : 'Buscar Imágenes'
-            )
+                'select',
+                {
+                    className: 'product-select-dropdown',
+                    value: selectedProductId,
+                    onChange: handleProductChange,
+                    disabled: isLoading || isAssigning || products.length === 0
+                },
+                createElement('option', { value: '' }, products.length === 0 && isLoading ? 'Cargando productos...' : '-- Seleccione un Perfume --'),
+                products.map(p => createElement('option', { key: p.id, value: p.id }, `${p.title} (ID: ${p.id})`))
+            ),
+            (statusMessage) && createElement('div', { className: 'search-status-message' }, statusMessage)
         ),
         createElement(
             'div',
             { className: 'image-grid' },
-            images.map((img) =>
+            images.map((img, idx) =>
                 createElement(
                     'div',
-                    { key: img.id, className: 'image-card' },
+                    { key: idx, className: 'image-card' },
                     createElement('img', { src: img.url, alt: img.title }),
                     createElement(
                         'button',
                         {
                             className: 'image-select-btn',
-                            onClick: () => alert(`Imagen seleccionada: ${img.title}\n(Aquí se integraría con el media library o WooCommerce)`)
+                            onClick: () => handleImageSelect(img.url),
+                            disabled: isAssigning
                         },
-                        'Seleccionar'
+                        isAssigning ? 'Asignando...' : 'Seleccionar'
                     )
                 )
             )
