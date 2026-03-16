@@ -61,6 +61,19 @@ class BruiserHub_API {
             )
         ) );
 
+        // Endpoint para configurar la API Key de Serper
+        register_rest_route( $this->namespace, '/set-serper-key', array(
+            'methods'  => 'POST',
+            'callback' => array( $this, 'set_serper_key_handler' ),
+            'permission_callback' => array( $this, 'check_permissions' ),
+            'args'     => array(
+                'api_key' => array(
+                    'required' => true,
+                    'type'     => 'string'
+                )
+            )
+        ) );
+
         // Endpoint de Comparador de Precios (Serper Shopping API)
         register_rest_route( $this->namespace, '/price-check', array(
             'methods'  => 'GET',
@@ -356,8 +369,23 @@ class BruiserHub_API {
         $mayor = array();
         $all_prices = array();
 
+        // Lista negra de palabras clave de mercado gris/decants/piratería
+        $blacklisted_words = array( 'decant', 'muestra', 'tester', 'vial', 'fraccion', 'fracción', 'miniatura', 'imitacion', 'imitación', 'replica', 'réplica', 'ml', 'onzas', 'oz' );
+
         foreach ( $shopping_results as $item ) {
             if ( ! isset( $item['price'] ) ) continue;
+
+            $item_title = isset( $item['title'] ) ? strtolower( $item['title'] ) : '';
+
+            // 1. FILTRO ANTI-DECANTS: Si el título contiene palabras clave de muestras o piratería, descartarlo inmediatamente
+            $is_blacklisted = false;
+            foreach ( $blacklisted_words as $word ) {
+                if ( strpos( $item_title, $word ) !== false ) {
+                    $is_blacklisted = true;
+                    break;
+                }
+            }
+            if ( $is_blacklisted ) continue;
 
             // Clean currency string to float (e.g. "$120.000 COP" or "$120,000")
             // Remove everything except numbers and dots/commas
@@ -369,6 +397,19 @@ class BruiserHub_API {
             $market_price = (float) $raw_price;
 
             if ( $market_price <= 0 ) continue;
+
+            // 2. FILTRO ANTI-PIRATERÍA/ESTAFA POR PRECIO EXTREMO (EXPERT MODE)
+            // Si el perfume es MÁS DE $50,000 COP más barato que nosotros, es un anuncio falso, piratería o error. Lo descartamos.
+            if ( ( $product_price - $market_price ) > 50000 ) {
+                continue;
+            }
+
+            // 3. FILTRO ANTI-ABUSO (OPCIONAL PERO SANO):
+            // Si el precio es absurdamente caro (más del triple de tu precio, o > $500,000 más caro),
+            // probablemente sea un pack de 3 o un vendedor fantasma. Lo descartamos para no arruinar la media matemática.
+            if ( ( $market_price - $product_price ) > 500000 ) {
+                continue;
+            }
 
             $all_prices[] = $market_price;
 
@@ -429,6 +470,22 @@ class BruiserHub_API {
             'similar' => $similar,
             'mayor' => $mayor
         ) );
+    }
+
+    /**
+     * Set Serper API Key Handler
+     */
+    public function set_serper_key_handler( WP_REST_Request $request ) {
+        $api_key = $request->get_param( 'api_key' );
+
+        $updated = update_option( 'bruiserhub_serper_api_key', sanitize_text_field( $api_key ) );
+
+        if ( $updated ) {
+            return rest_ensure_response( array( 'status' => 'success', 'message' => 'Serper API Key saved successfully.' ) );
+        } else {
+            // update_option returns false if the value is the same as the existing one.
+            return rest_ensure_response( array( 'status' => 'success', 'message' => 'Serper API Key is already set to this value.' ) );
+        }
     }
 
     /**

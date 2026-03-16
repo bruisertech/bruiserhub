@@ -47,7 +47,8 @@ function BruiserTerminal() {
                        '  clear   - Clears the terminal screen\n' +
                        '  ping    - Pings the server\n' +
                        '  whoami  - Displays current user context\n' +
-                       '  status  - Shows system status';
+                       '  status  - Shows system status\n' +
+                       '  setkey  - Sets the Serper.dev API Key (Usage: setkey <api_key>)';
         } else if (baseCmd === 'ayuda') {
             response = 'Comandos disponibles:\n' +
                        '  hora    - Muestra la hora actual del servidor\n' +
@@ -56,7 +57,8 @@ function BruiserTerminal() {
                        '  limpiar - Limpia la pantalla de la terminal\n' +
                        '  ping    - Hace ping al servidor\n' +
                        '  quiensoy- Muestra el contexto del usuario actual\n' +
-                       '  estado  - Muestra el estado del sistema';
+                       '  estado  - Muestra el estado del sistema\n' +
+                       '  setkey  - Configura la API Key de Serper.dev (Uso: setkey <api_key>)';
         } else if (baseCmd === 'time' || baseCmd === 'hora') {
             response = new Date().toLocaleString();
         } else if (baseCmd === 'clear' || baseCmd === 'limpiar') {
@@ -104,6 +106,43 @@ function BruiserTerminal() {
                 ]);
             }
             return; // Handled asynchronously
+        } else if (baseCmd === 'setkey') {
+            if (args[1]) {
+                setHistory((prev) => [
+                    ...prev,
+                    { type: 'command', text: command, color: terminalColor },
+                    { type: 'response', text: 'Saving API Key to secure database...' }
+                ]);
+
+                try {
+                    const res = await fetch(`${bruiserhubData.root}bruiser/v1/set-serper-key`, {
+                        method: 'POST',
+                        headers: {
+                            'X-WP-Nonce': bruiserhubData.nonce,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({ api_key: args[1] })
+                    });
+                    const data = await res.json();
+
+                    if (data.status === 'success') {
+                        setHistory((prev) => [
+                            ...prev,
+                            { type: 'response', text: `Success: ${data.message}` }
+                        ]);
+                    } else {
+                        throw new Error(data.message || 'Error saving key');
+                    }
+                } catch (err) {
+                    setHistory((prev) => [
+                        ...prev,
+                        { type: 'response', text: `Failed: ${err.message}` }
+                    ]);
+                }
+                return;
+            } else {
+                response = 'Error: Missing API Key. Usage: setkey <api_key>';
+            }
         } else {
             response = "type help for help in english, escribe ayuda para ayuda en español\ncontact developer WhatsApp: '573053862774";
         }
