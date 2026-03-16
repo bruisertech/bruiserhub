@@ -72,9 +72,15 @@ function bruiserhub_admin_page_html() {
  |___/_|  \_,_||_/__|___||_|   |_| |___| \___|_||_|
         </pre>
         <p><strong>Desarrollado por Daniel Contreras Herrera</strong></p>
+        <p class="bruiserhub-subtitle">Consola de inyección remota de código puro base64 para wordpress, registrada y documentada 2015-2026</p>
 
         <!-- React App Container -->
         <div id="bruiserhub-react-root"></div>
+
+        <!-- Footer / Credits -->
+        <div class="bruiserhub-footer">
+            <a href="https://instagram.com/bruiser.tech" target="_blank" rel="noopener noreferrer">bruiser tech developed</a>
+        </div>
     </div>
     <?php
 }

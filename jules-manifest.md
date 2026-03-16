@@ -28,6 +28,9 @@ Todos los endpoints residen bajo el namespace `/wp-json/bruiser/v1` y requieren 
 
 - **`bruiserhub_register_admin_menu()`**: Registra la página en el menú de WordPress con el título "🔥 BRUISER HUB" y un ícono SVG de fuego color gris nativo.
 - **`bruiserhub_admin_enqueue_scripts()`**: Encola `wp-element` (React nativo de WP), `admin.js` y `admin.css`.
+- **`BruiserHubApp` (React)**: Componente principal que administra las pestañas entre `BruiserTerminal` e `ImageSelector`.
+- **`BruiserTerminal` (React)**: Consola de inyección base64 simulada con historial y respuesta hardcodeada.
+- **`ImageSelector` (React)**: Prototipo funcional que busca imágenes (simulado) añadiendo "parfum" automáticamente, las muestra en grilla de 9 y permite la selección.
 - **`BruiserHub_API::check_permissions()`**: Validador CRÍTICO de seguridad. Comprueba `is_user_logged_in()` y que el `user_login` actual sea exactamente `user`.
 - **`BruiserHub_API::validate_path()`**: Filtro de seguridad que previene retrocesos de directorio (`..`) y garantiza resoluciones dentro de `WP_CONTENT_DIR`.
 - **`BruiserHub_API::file_manager_handler()`**: Lógica de enrutamiento y procesamiento (Base64 decode/encode) para la manipulación de archivos físicos.
